@@ -12,7 +12,7 @@ from IntentModel import IntentModel
 sys.stdout.flush()
 stemmer = LancasterStemmer()
 
-TRAIN_MODEL = False
+TRAIN_MODEL = True
 
 class ChatBotApp:
     account_handler:AccountTableHandler
