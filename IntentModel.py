@@ -2,11 +2,12 @@ import os
 import numpy
 import random
 import json
+import nltk
+from keras import models, layers
 from nltk.stem.lancaster import LancasterStemmer
-from tensorflow.keras import layers, models
 from pathlib import Path
 from nltk.tokenize import word_tokenize
-
+nltk.download('punkt')
 
 class IntentModel:
     model:models
@@ -58,9 +59,9 @@ class IntentModel:
                         self.model = tmp_model
 
             print("===== {} =====".format(Path(intent_file_path).stem))
-            print(" Best Epochs: ", best_epochs)
-            print(" Best Batch Size: ", best_batch_size)
-            print(" Best Accuracy: ", best_accuracy)
+            print(" Epochs: ", best_epochs)
+            print(" Batch Size: ", best_batch_size)
+            print(" Accuracy: ", best_accuracy)
             self.model.save(model_path)
         pass
 

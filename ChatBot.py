@@ -1,7 +1,9 @@
-import msvcrt
+import getpass
 import sys
 import random
 import time
+import os
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 from datetime import datetime
 from pathlib import Path
 from Database import AccountTableHandler, QuizBankPythonTableHandler, QuizRecordTableHandler, LoginRecordTableHandler
@@ -10,7 +12,7 @@ from IntentModel import IntentModel
 sys.stdout.flush()
 stemmer = LancasterStemmer()
 
-TRAIN_MODEL = True
+TRAIN_MODEL = False
 
 class ChatBotApp:
     account_handler:AccountTableHandler
@@ -29,6 +31,7 @@ class ChatBotApp:
         self.quiz_bank_handler = QuizBankPythonTableHandler(f"{self.working_dir}/rsc/tables/QuizBankPythonTable.json")
         self.quiz_record_handler = QuizRecordTableHandler(f"{self.working_dir}/rsc/tables/QuizRecordTable.json")
         self.current_user_id = None
+        # Initialize intent models for menu and chat functionalities, with options to force retraining and specify epochs and batch sizes for training.
         self.menu_intent_model = IntentModel(f"{self.working_dir}/rsc/intents/MenuIntents.json", force_retrain=TRAIN_MODEL, epochs_list=[500], batch_size_list=[16])
         self.chat_intent_model = IntentModel(f"{self.working_dir}/rsc/intents/ChatIntents.json", force_retrain=TRAIN_MODEL, epochs_list=[500], batch_size_list=[16])
         self.quiz_encourage_message = [
@@ -39,40 +42,14 @@ class ChatBotApp:
             "Every step you take is progress, keep going!!!"
         ]
 
-    def input_password_masked(self, prompt:str="Enter password: "):
-        print(prompt, end="", flush=True)
-        chars = []
-
-        while True:
-            # capture key press without echoing to console
-            ch = msvcrt.getwch()
-
-            if ch in ("\r", "\n"):
-                print()
-                break
-
-            # handle backspace
-            if ch == "\x08":
-                if chars:
-                    chars.pop()
-                    print("\b \b", end="", flush=True)
-                continue
-            
-            # ignore special keys (e.g., arrow keys, function keys)
-            if ch in ("\x00", "\xe0"):
-                msvcrt.getwch()  # consume the next character for special keys
-                continue
-                
-            chars.append(ch)
-            print("*", end="", flush=True)
-
-        return "".join(chars)
-
     def run(self):
         while True:
+
+            print("\nPolyU SPEED SEHS4678 NKH, CLS, WFW, WST")
+
             print("\n=== Login ===")
             username = input("Enter username: ")
-            password = self.input_password_masked("Enter password: ")
+            password = getpass.getpass("Enter password: ")
 
             user_id = self.account_handler.verify_username_password(username, password)
             if user_id is None:
@@ -80,7 +57,13 @@ class ChatBotApp:
                 continue
 
             self.current_user_id = user_id
-            self.slow_print(f"\nWelcome, {username}!!", split_by_line=False, print_delay=0.02)
+            login_count = len(self.login_record_handler.query_login_records_by_user_id(self.current_user_id))
+            if login_count > 0:
+                self.slow_print(f"\nHappy to see you again, {username}!!", split_by_line=False, print_delay=0.02)
+            else:
+                self.slow_print(f"\nThis is the first time to see you, {username}!!", split_by_line=False, print_delay=0.02)
+
+            
             self.login_record_handler.insert_login_record(user_id)
             self.show_main_menu()
             break
@@ -113,7 +96,7 @@ class ChatBotApp:
                 self.start_encourage(responses)
             elif choose == "chat":
                 self.start_chat()
-
+    
     def start_chat(self):
         print("\n=== Chat ===")
         self.slow_print("Bot: Hello! I'm a chatbot, how can I help you today?", print_delay=0.02, split_by_line=False)
@@ -131,10 +114,10 @@ class ChatBotApp:
 
     def start_encourage(self, responses):
         extract_message = ""
-        quiz_records = self.quiz_record_handler.get_quiz_results_by_user_id(self.current_user_id)
+        
+        # This part of the code is used to extract the messsage by user login fequency
         login_records = self.login_record_handler.query_login_records_by_user_id(self.current_user_id)
 
-        # print deatils about user's quiz and login records
         if len(login_records) > 0:
             if len(login_records) > 1:
                 last_login_time_1 = datetime.strptime(login_records[-2]["login_time"], "%Y-%m-%dT%H:%M:%S")
@@ -145,7 +128,9 @@ class ChatBotApp:
 
             extract_message += "Your last login time is {}. ".format(login_records[-1]["login_time"].replace("T", " "))
 
-        # print details about user's quiz records
+        # This part of the code is used to extract the message by user quiz performance
+        quiz_records = self.quiz_record_handler.get_quiz_results_by_user_id(self.current_user_id)
+
         if len(quiz_records) > 0:
             soure_message = ""
             if len(quiz_records) > 1:
@@ -164,7 +149,8 @@ class ChatBotApp:
             responses = f"{extract_message}{responses}"
 
         self.slow_print(f"\nBot: {responses}", split_by_line=False, print_delay=0.002)
-
+    
+    #This method provide a quiz question include multiple-choice and fill-in-the-blank to user, and calculate the quiz score after user answer all questions. The quiz questions are randomly selected from the quiz bank, and the score is calculated based on the number of correct answers. And provides encouragement messages based on the user's quiz performance and login frequency, which are extracted from the user's quiz and login records. The quiz results are also saved to the database for future reference and analysis.
     def start_quiz(self):
         print("\n=== Quiz ===")
         quiz_bank = self.quiz_bank_handler.get_all_quiz()
